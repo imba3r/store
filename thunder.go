@@ -73,6 +73,7 @@ func (s *Store) Read(key string) ([]byte, error) {
 		if err != nil {
 			return err
 		}
+		value = make([]byte, len(v))
 		copy(value, v)
 		return nil
 	})
