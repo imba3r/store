@@ -4,36 +4,38 @@ import (
 	"encoding/json"
 	"net/http"
 	"log"
+
 	"github.com/gorilla/websocket"
 )
 
-type WebsocketOperation string
+type WebSocketOperation string
 
 const (
-	// Incoming messages
-	Subscribe WebsocketOperation = "SUBSCRIBE"
-	Insert    WebsocketOperation = "INSERT"
-	Update    WebsocketOperation = "UPDATE"
-	Delete    WebsocketOperation = "DELETE"
+	// Incoming
+	Subscribe   WebSocketOperation = "SUBSCRIBE"
+	Add         WebSocketOperation = "ADD"
+	Set         WebSocketOperation = "SET"
+	Update      WebSocketOperation = "UPDATE"
+	Delete      WebSocketOperation = "DELETE"
 
-	// Outgoing messages
-	ValueChange WebsocketOperation = "VALUE_CHANGE"
+	// Outgoing
+	ValueChange WebSocketOperation = "VALUE_CHANGE"
 
 	// Incoming & Outgoing
-	Snapshot WebsocketOperation = "SNAPSHOT"
+	Snapshot    WebSocketOperation = "SNAPSHOT"
 )
 
-type Message struct {
+type WebSocketMessage struct {
+	Operation       WebSocketOperation `json:"operation"`
 	Key             string             `json:"key"`
-	Operation       WebsocketOperation `json:"operation"`
 	ID              uint64             `json:"id"`
 	Payload         json.RawMessage    `json:"payload,omitempty"`
 	PayloadMetadata PayloadMetadata    `json:"payloadMetadata,omitempty"`
 }
 
 type PayloadMetadata struct {
-	Type   string `json:"type"`
-	Exists bool   `json:"exists"`
+	Type   ValueType `json:"valueType"`
+	Exists bool      `json:"exists"`
 }
 
 func (s *Store) HandlerFunc() http.HandlerFunc {
@@ -66,7 +68,7 @@ func (s *Store) HandlerFunc() http.HandlerFunc {
 				continue
 			}
 
-			var m Message
+			var m WebSocketMessage
 			err = json.Unmarshal(msg, &m)
 			if err != nil {
 				log.Println("[ERR] json.Unmarshal", err)
@@ -77,17 +79,16 @@ func (s *Store) HandlerFunc() http.HandlerFunc {
 			case Subscribe:
 				if _, exists := subscriptions[m.Key]; !exists {
 					subscriptions[m.Key] = s.Subscribe(m.Key)
+					data, _ := s.Read(m.Key)
+					s.writeMessage(conn, createAnswer(Snapshot, m.Key, m.ID, data))
 					go s.listen(m.Key, subscriptions[m.Key], conn)
 				}
 			case Update:
 				s.Update(m.Key, m.Payload)
-			case Insert:
+			case Add:
 				s.Insert(m.Key, m.Payload)
 			case Delete:
 				s.Delete(m.Key)
-			case Snapshot:
-				data, _ := s.Read(m.Key)
-				s.writeMessage(conn, createAnswer(Snapshot, m.Key, m.ID, data))
 			}
 		}
 	}
@@ -115,8 +116,8 @@ func (s *Store) writeMessage(conn *websocket.Conn, message []byte) {
 	}
 }
 
-func createAnswer(operation WebsocketOperation, key string, id uint64, data []byte) []byte {
-	answer := &Message{
+func createAnswer(operation WebSocketOperation, key string, id uint64, data []byte) []byte {
+	answer := &WebSocketMessage{
 		Operation: operation,
 		Key:       key,
 		ID:        id,
