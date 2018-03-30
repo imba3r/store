@@ -55,6 +55,10 @@ func (bs *badgerStore) Close() {
 	bs.db.Close();
 }
 
+func (d *document) Key() string {
+	return d.key
+}
+
 func (d *document) Get() ([]byte, error) {
 	var value []byte
 	err := d.db.View(func(txn *badger.Txn) error {
@@ -92,6 +96,10 @@ func (d *document) Delete() error {
 	return d.db.Update(func(txn *badger.Txn) error {
 		return txn.Delete([]byte(d.key))
 	})
+}
+
+func (c *collection) Key() string {
+	return c.key
 }
 
 func (c *collection) Add(data []byte) (thunder.Document, error) {
