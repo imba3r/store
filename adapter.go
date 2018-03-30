@@ -1,24 +1,23 @@
 package thunder
 
-
 type adapter struct {
 	store        Store
-	eventHandler *EventHandler
+	eventHandler EventHandler
 }
 
 type document struct {
 	document     Document
-	eventHandler *EventHandler
+	eventHandler EventHandler
 }
 
 type collection struct {
 	collection   Collection
-	eventHandler *EventHandler
+	eventHandler EventHandler
 }
 
 var _ Store = &adapter{}
 
-func newAdapter(store Store, eventHandler *EventHandler) *adapter {
+func newAdapter(store Store, eventHandler EventHandler) *adapter {
 	return &adapter{store, eventHandler}
 }
 
@@ -46,7 +45,7 @@ func (d *document) Get() ([]byte, error) {
 
 func (d *document) Set(data []byte) error {
 	err := d.document.Set(data)
-	if err != nil {
+	if err == nil {
 		d.eventHandler.Publish(d.document.Key(), data)
 	}
 	return err
@@ -54,7 +53,7 @@ func (d *document) Set(data []byte) error {
 
 func (d *document) Update(data []byte) error {
 	err := d.document.Update(data)
-	if err != nil {
+	if err == nil {
 		d.eventHandler.Publish(d.document.Key(), data)
 	}
 	return err
@@ -62,7 +61,7 @@ func (d *document) Update(data []byte) error {
 
 func (d *document) Delete() error {
 	err := d.document.Delete()
-	if err != nil {
+	if err == nil {
 		d.eventHandler.Publish(d.document.Key(), nil)
 	}
 	return err
@@ -74,7 +73,7 @@ func (c *collection) Key() string {
 
 func (c *collection) Add(data []byte) (Document, error) {
 	doc, err := c.collection.Add(data)
-	if err != nil {
+	if err == nil {
 		// TODO
 	}
 	return doc, err

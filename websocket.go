@@ -6,41 +6,64 @@ import (
 	"log"
 
 	"github.com/gorilla/websocket"
+	"sync"
 )
 
 type WebSocketOperation string
 
 const (
 	// Incoming
-	Subscribe   WebSocketOperation = "SUBSCRIBE"
-	Add         WebSocketOperation = "ADD"
-	Set         WebSocketOperation = "SET"
-	Update      WebSocketOperation = "UPDATE"
-	Delete      WebSocketOperation = "DELETE"
+	Subscribe WebSocketOperation = "SUBSCRIBE"
+	Add       WebSocketOperation = "ADD"
+	Set       WebSocketOperation = "SET"
+	Update    WebSocketOperation = "UPDATE"
+	Delete    WebSocketOperation = "DELETE"
 
 	// Outgoing
 	ValueChange WebSocketOperation = "VALUE_CHANGE"
 
 	// Incoming & Outgoing
-	Snapshot    WebSocketOperation = "SNAPSHOT"
+	Snapshot WebSocketOperation = "SNAPSHOT"
 )
+
+type WebSocketHandler struct {
+	thunder  *Thunder
+	upgrader websocket.Upgrader
+	mutex    sync.Mutex
+}
 
 type WebSocketMessage struct {
 	Operation       WebSocketOperation `json:"operation"`
 	Key             string             `json:"key"`
-	ID              uint64             `json:"id"`
+	RequestID       uint64             `json:"requestId"`
+	TransactionID   uint64             `json:"transactionId"`
+	Error           Error              `json:"error"`
 	Payload         json.RawMessage    `json:"payload,omitempty"`
 	PayloadMetadata PayloadMetadata    `json:"payloadMetadata,omitempty"`
 }
 
-type PayloadMetadata struct {
-	Type   ValueType `json:"valueType"`
-	Exists bool      `json:"exists"`
+type Error struct {
+	Message string `json:"message"`
 }
 
-func (s *Store) HandlerFunc() http.HandlerFunc {
+type PayloadMetadata struct {
+	Exists bool `json:"exists"`
+}
+
+func NewWebSocketHandler(thunder *Thunder) *WebSocketHandler {
+	return &WebSocketHandler{
+		thunder: thunder,
+		upgrader: websocket.Upgrader{
+			ReadBufferSize:  1024,
+			WriteBufferSize: 1024,
+			CheckOrigin:     func(r *http.Request) bool { return true },
+		},
+	};
+}
+
+func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		conn, err := s.upgrader.Upgrade(w, r, nil)
+		conn, err := h.upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println("[ERR] websocket.Upgrader.Upgrade", err)
 			return
@@ -51,14 +74,13 @@ func (s *Store) HandlerFunc() http.HandlerFunc {
 		subscriptions := make(map[string]chan []byte)
 		conn.SetCloseHandler(func(code int, text string) error {
 			for key, channel := range subscriptions {
-				s.Unsubscribe(key, channel)
+				h.thunder.EventHandler.Unsubscribe(key, channel)
 			}
 			return nil;
 		})
 
 		for {
 			msgType, msg, err := conn.ReadMessage()
-			log.Println(string(msg))
 			if err != nil {
 				log.Println("[ERR] websocket.Conn.ReadMessage", err)
 				return
@@ -78,37 +100,59 @@ func (s *Store) HandlerFunc() http.HandlerFunc {
 			switch m.Operation {
 			case Subscribe:
 				if _, exists := subscriptions[m.Key]; !exists {
-					subscriptions[m.Key] = s.Subscribe(m.Key)
-					data, _ := s.Read(m.Key)
-					s.writeMessage(conn, createAnswer(Snapshot, m.Key, m.ID, data))
-					go s.listen(m.Key, subscriptions[m.Key], conn)
+					subscriptions[m.Key] = h.thunder.EventHandler.Subscribe(m.Key)
+					go h.listen(m.Key, subscriptions[m.Key], conn)
+					// TODO: Distinguish documents and collections, send one snapshot here
+				}
+			case Set:
+				d, err := h.thunder.Store.Document(m.Key)
+				if err != nil {
+					log.Println("[ERR:Set]", err)
+				}
+				err = d.Set(m.Payload)
+				if err != nil {
+					log.Println("[ERR:Set]", err)
 				}
 			case Update:
-				s.Update(m.Key, m.Payload)
-			case Add:
-				s.Insert(m.Key, m.Payload)
+				d, err := h.thunder.Store.Document(m.Key)
+				if err != nil {
+					log.Println("[ERR:Update]", err)
+				}
+				err = d.Update(m.Payload)
+				if err != nil {
+					log.Println("[ERR:Update]", err)
+				}
 			case Delete:
-				s.Delete(m.Key)
+				d, err := h.thunder.Store.Document(m.Key)
+				if err != nil {
+					log.Println("[ERR:Delete]", err)
+				}
+				err = d.Delete()
+				if err != nil {
+					log.Println("[ERR:Delete]", err)
+				}
+			case Add:
+				// TODO
 			}
 		}
 	}
 }
 
-func (s *Store) listen(key string, channel chan []byte, conn *websocket.Conn) {
+func (h *WebSocketHandler) listen(key string, channel chan []byte, conn *websocket.Conn) {
 	for {
 		select {
 		case m, ok := <-channel:
 			if !ok {
 				return
 			}
-			s.writeMessage(conn, createAnswer(ValueChange, key, 0, m))
+			h.writeMessage(conn, createAnswer(ValueChange, key, 0, m))
 		}
 	}
 }
 
-func (s *Store) writeMessage(conn *websocket.Conn, message []byte) {
-	defer s.mutex.Unlock()
-	s.mutex.Lock()
+func (h *WebSocketHandler) writeMessage(conn *websocket.Conn, message []byte) {
+	defer h.mutex.Unlock()
+	h.mutex.Lock()
 
 	err := conn.WriteMessage(websocket.TextMessage, message)
 	if err != nil {
@@ -120,7 +164,7 @@ func createAnswer(operation WebSocketOperation, key string, id uint64, data []by
 	answer := &WebSocketMessage{
 		Operation: operation,
 		Key:       key,
-		ID:        id,
+		RequestID: id,
 		Payload:   data,
 	}
 	data, err := json.Marshal(answer)

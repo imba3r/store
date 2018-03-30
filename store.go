@@ -1,10 +1,7 @@
 package thunder
 
-type Value interface {
-	Key() string
-}
-
 type Document interface {
+	Key() string
 	Get() ([]byte, error)
 	Set(data []byte) error
 	Update(data []byte) error
@@ -12,6 +9,7 @@ type Document interface {
 }
 
 type Collection interface {
+	Key() string
 	Add(data []byte) (Document, error)
 }
 

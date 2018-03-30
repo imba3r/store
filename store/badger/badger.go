@@ -87,6 +87,7 @@ func (d *document) Set(data []byte) error {
 }
 
 func (d *document) Update(data []byte) error {
+	// TODO check if it exists
 	return d.db.Update(func(txn *badger.Txn) error {
 		return txn.Set([]byte(d.path), data)
 	})

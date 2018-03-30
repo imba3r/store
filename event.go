@@ -1,7 +1,19 @@
 package thunder
 
-type EventHandler struct {
-	reg *registry
+import (
+	"log"
+	"fmt"
+)
+
+type EventHandler interface {
+	Subscribe(key string) chan []byte
+	Unsubscribe(key string, channel chan []byte)
+	Publish(key string, data []byte)
+}
+
+type eventHandler struct {
+	reg       *registry
+	logEvents bool
 }
 
 type cmd struct {
@@ -30,19 +42,22 @@ const (
 	unsub
 )
 
-func newEventHandler() *EventHandler {
-	return &EventHandler{newRegistry()}
+func newEventHandler(logEvents bool) EventHandler {
+	return &eventHandler{newRegistry(), logEvents}
 }
 
-func (e *EventHandler) Subscribe(key string) chan []byte {
+func (e *eventHandler) Subscribe(key string) chan []byte {
 	return e.reg.subscribe(key)
 }
 
-func (e *EventHandler) Unsubscribe(key string, channel chan []byte) {
+func (e *eventHandler) Unsubscribe(key string, channel chan []byte) {
 	e.reg.unsubscribe(key, channel)
 }
 
-func (e *EventHandler) Publish(key string, data []byte) {
+func (e *eventHandler) Publish(key string, data []byte) {
+	if e.logEvents {
+		log.Println(fmt.Sprintf("[PUBLISH:%s] %s", key, data))
+	}
 	e.reg.publish(key, data)
 }
 

@@ -8,7 +8,8 @@ import (
 )
 
 func main() {
-	t := thunder.New(badger.New("/tmp/badger"))
-	http.HandleFunc("/thunder", t.HandlerFunc())
+	t := thunder.New(badger.New("/tmp/store"), true)
+	h := thunder.NewWebSocketHandler(t)
+	http.HandleFunc("/thunder", h.HandlerFunc())
 	http.ListenAndServe(":3000", nil)
 }
