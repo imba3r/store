@@ -12,7 +12,7 @@ type Document interface {
 
 type Collection interface {
 	Key() string
-	All() ([]CollectionItem, error)
+	Query() Query
 	Add(data []byte) (Document, error)
 }
 
@@ -20,6 +20,12 @@ type Store interface {
 	Document(path string) (Document, error)
 	Collection(path string) (Collection, error)
 	Close()
+}
+
+type Query interface {
+	Items() ([]CollectionItem, error)
+	OrderBy(key string, ascending bool) Query
+	Limit(limit int) Query
 }
 
 type CollectionItem struct {

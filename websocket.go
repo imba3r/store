@@ -44,9 +44,8 @@ type WebSocketMessage struct {
 }
 
 type OperationParameters struct {
-	Order         Order         `json:"order"`
-	OrderBy       string        `json:"orderBy"`
-	OrderDataType OrderDataType `json:"orderDataType"`
+	OrderBy   string `json:"orderBy"`
+	Ascending bool   `json:"ascending"`
 }
 
 type Error struct {
@@ -114,17 +113,16 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 							return data;
 						}
 						if IsCollectionKey(m.Key) {
-							doc, err := h.thunder.Store.Collection(m.Key)
-							if err != nil {
-								log.Println(err)
-							}
-							items, err := doc.All();
-							log.Println(items)
+							c, err := h.thunder.Store.Collection(m.Key)
 							if err != nil {
 								log.Println(err)
 							}
 
-							OrderByNumber(items, "count", false)
+							items, err := c.Query().OrderBy("count", true).Limit(15).Items()
+							log.Println(items)
+							if err != nil {
+								log.Println(err)
+							}
 
 							data, err := json.Marshal(items);
 							if err != nil {
@@ -149,11 +147,11 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 						h.writeMessage(conn, createAnswer(ValueChange, m.Key, 0, data))
 					}
 					if IsCollectionKey(m.Key) {
-						d, err := h.thunder.Store.Collection(m.Key)
+						c, err := h.thunder.Store.Collection(m.Key)
 						if err != nil {
 							log.Println("[ERR:Subscribe]", err)
 						}
-						items, err := d.All()
+						items, err := c.Query().Items()
 						if err != nil {
 							log.Println("[ERR:Subscribe]", err)
 						}

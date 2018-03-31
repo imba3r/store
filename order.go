@@ -5,20 +5,7 @@ import (
 	"github.com/Jeffail/gabs"
 )
 
-type Order string
-
-const (
-	ASCENDING  Order = "ASC"
-	DESCENDING Order = "DESC"
-)
-
-type OrderDataType string
-
-const (
-	Number OrderDataType = "NUMBER"
-)
-
-func OrderByNumber(items []CollectionItem, path string, ascending bool) {
+func OrderBy(items []CollectionItem, path string, ascending bool) {
 	sort.Slice(items, func(i, j int) bool {
 		if !ascending {
 			i, j = j, i
@@ -31,14 +18,27 @@ func OrderByNumber(items []CollectionItem, path string, ascending bool) {
 		if err != nil {
 			return false
 		}
-		valueA, ok := a.Search(path).Data().(float64)
-		if !ok {
+		valueA := a.Search(path).Data()
+		valueB := b.Search(path).Data()
+		if valueA == nil && valueB != nil {
 			return true
 		}
-		valueB, ok := b.Search(path).Data().(float64)
-		if !ok {
+		if valueB == nil {
 			return false
 		}
-		return valueA < valueB
+		return Less(valueA, valueB)
 	})
+}
+
+func Less(a interface{}, b interface{}) bool {
+	switch a.(type) {
+	case float64:
+		b, ok := b.(float64)
+		return ok && a.(float64) < b
+	case string:
+		b, ok := b.(string)
+		return ok && a.(string) < b
+	default:
+		return false
+	}
 }

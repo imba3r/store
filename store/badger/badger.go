@@ -16,13 +16,20 @@ type badgerStore struct {
 }
 
 type document struct {
-	key string
-	store  *badgerStore
+	key   string
+	store *badgerStore
 }
 
 type collection struct {
-	key string
-	store  *badgerStore
+	key   string
+	store *badgerStore
+}
+
+type query struct {
+	collection *collection
+	limit      int
+	orderBy    string
+	ascending  bool
 }
 
 var _ thunder.Store = &badgerStore{}
@@ -121,16 +128,18 @@ func (c *collection) Add(data []byte) (thunder.Document, error) {
 	return d, d.Set(data)
 }
 
-func (c *collection) All() ([]thunder.CollectionItem, error) {
-	var items []thunder.CollectionItem
-	err := c.store.db.View(func(txn *badger.Txn) error {
+func (c *collection) Query() thunder.Query {
+	return &query{collection: c}
+}
 
-		// Create iterator that does not prefetch values.
+func (q *query) Items() ([]thunder.CollectionItem, error) {
+	var items []thunder.CollectionItem
+	err := q.collection.store.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
 
 		// Iterate with collection key as prefix.
-		prefix := []byte(c.key)
+		prefix := []byte(q.collection.key)
 		prefix = append(prefix, byte('/'))
 		prefixLength := len(prefix)
 		var itemCopyDst []byte
@@ -145,8 +154,25 @@ func (c *collection) All() ([]thunder.CollectionItem, error) {
 				}
 				items = append(items, thunder.CollectionItem{Key: string(key), Value: itemCopyDst})
 			}
-		}
+ 		}
 		return nil
 	})
+	if q.orderBy != "" {
+		thunder.OrderBy(items, q.orderBy, q.ascending)
+	}
+	if q.limit != 0 {
+		return items[:q.limit], err
+	}
 	return items, err
+}
+
+func (q *query) Limit(limit int) thunder.Query {
+	q.limit = limit
+	return q
+}
+
+func (q *query) OrderBy(key string, ascending bool) thunder.Query {
+	q.orderBy = key
+	q.ascending = ascending
+	return q
 }

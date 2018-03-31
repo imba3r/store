@@ -86,6 +86,6 @@ func (c *collection) Add(data []byte) (Document, error) {
 	return doc, err
 }
 
-func (c *collection) All() ([]CollectionItem, error) {
-	return c.collection.All()
+func (c *collection) Query() Query {
+	return c.collection.Query()
 }
