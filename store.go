@@ -1,5 +1,7 @@
 package thunder
 
+import "encoding/json"
+
 type Document interface {
 	Key() string
 	Get() ([]byte, error)
@@ -21,6 +23,16 @@ type Store interface {
 }
 
 type CollectionItem struct {
-	Key   string `json:"key"`
-	Value []byte `json:"value,omitempty"`
+	Key   string
+	Value []byte
+}
+
+func (i CollectionItem) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Key   string          `json:"key"`
+		Value json.RawMessage `json:"value"`
+	}{
+		Key:   i.Key,
+		Value: i.Value,
+	})
 }

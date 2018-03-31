@@ -101,7 +101,6 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 			case Subscribe:
 				if _, exists := subscriptions[m.Key]; !exists {
 					subscriptions[m.Key] = h.thunder.EventHandler.SubscribeWithFunc(m.Key, func() []byte {
-						log.Println("Calling subscription Function!")
 						if IsDocumentKey(m.Key) {
 							doc, _ := h.thunder.Store.Document(m.Key)
 							data, _ := doc.Get();
