@@ -24,14 +24,14 @@ type cmd struct {
 	data    []byte
 }
 
-type entry struct {
+type topic struct {
 	key         string
 	subscribers []chan []byte
 }
 
 type registry struct {
 	cmdChan chan cmd
-	entries map[string]*entry
+	topics  map[string]*topic
 }
 
 type registryOperation int
@@ -78,7 +78,7 @@ func (r *registry) unsubscribe(key string, c chan []byte) {
 func newRegistry() *registry {
 	r := &registry{
 		cmdChan: make(chan cmd),
-		entries: make(map[string]*entry),
+		topics:  make(map[string]*topic),
 	}
 	go r.start()
 	return r
@@ -98,11 +98,11 @@ func (r *registry) start() {
 }
 
 func (r *registry) doPublish(key string, data []byte) {
-	e, exists := r.entries[key]
+	t, exists := r.topics[key]
 	if !exists {
 		return
 	}
-	for _, sub := range e.subscribers {
+	for _, sub := range t.subscribers {
 		select {
 		case sub <- data:
 		default:
@@ -111,34 +111,34 @@ func (r *registry) doPublish(key string, data []byte) {
 }
 
 func (r *registry) doSubscribe(key string, channel chan []byte) {
-	e, exists := r.entries[key]
+	t, exists := r.topics[key]
 	if !exists {
-		r.entries[key] = &entry{
+		r.topics[key] = &topic{
 			key:         key,
 			subscribers: []chan []byte{channel},
 		}
 	} else {
-		e.subscribers = append(e.subscribers, channel)
+		t.subscribers = append(t.subscribers, channel)
 	}
 }
 
 func (r *registry) doUnsubscribe(topicName string, channel chan []byte) {
 	defer close(channel)
-	e, exists := r.entries[topicName]
+	t, exists := r.topics[topicName]
 	if !exists {
 		return
 	}
 	position := -1
-	for i, sub := range e.subscribers {
+	for i, sub := range t.subscribers {
 		if sub == channel {
 			position = i
 		}
 	}
 	if position >= 0 {
-		e.subscribers[position] = e.subscribers[len(e.subscribers)-1]
-		e.subscribers = e.subscribers[:len(e.subscribers)-1]
+		t.subscribers[position] = t.subscribers[len(t.subscribers)-1]
+		t.subscribers = t.subscribers[:len(t.subscribers)-1]
 	}
-	if (len(e.subscribers) == 0) {
-		delete(r.entries, topicName)
+	if (len(t.subscribers) == 0) {
+		delete(r.topics, topicName)
 	}
 }
