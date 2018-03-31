@@ -18,7 +18,7 @@ const (
 	Number OrderDataType = "NUMBER"
 )
 
-func orderByNumber(items []CollectionItem, path string, ascending bool) {
+func OrderByNumber(items []CollectionItem, path string, ascending bool) {
 	sort.Slice(items, func(i, j int) bool {
 		if !ascending {
 			i, j = j, i

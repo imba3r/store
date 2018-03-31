@@ -124,7 +124,7 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 								log.Println(err)
 							}
 
-							orderByNumber(items, "count", false)
+							OrderByNumber(items, "count", false)
 
 							data, err := json.Marshal(items);
 							if err != nil {
