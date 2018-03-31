@@ -44,8 +44,9 @@ type WebSocketMessage struct {
 }
 
 type OperationParameters struct {
-	Order   string `json:"order"`
-	OrderBy string `json:"orderBy"`
+	Order         Order         `json:"order"`
+	OrderBy       string        `json:"orderBy"`
+	OrderDataType OrderDataType `json:"orderDataType"`
 }
 
 type Error struct {
@@ -123,7 +124,7 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 								log.Println(err)
 							}
 
-							sortByNumber(items, "count")
+							orderByNumber(items, "count", false)
 
 							data, err := json.Marshal(items);
 							if err != nil {

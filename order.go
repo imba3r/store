@@ -5,8 +5,24 @@ import (
 	"github.com/Jeffail/gabs"
 )
 
-func sortByNumber(items []CollectionItem, path string) {
+type Order string
+
+const (
+	ASCENDING  Order = "ASC"
+	DESCENDING Order = "DESC"
+)
+
+type OrderDataType string
+
+const (
+	Number OrderDataType = "NUMBER"
+)
+
+func orderByNumber(items []CollectionItem, path string, ascending bool) {
 	sort.Slice(items, func(i, j int) bool {
+		if !ascending {
+			i, j = j, i
+		}
 		a, err := gabs.ParseJSON(items[i].Value)
 		if err != nil {
 			return true
