@@ -1,4 +1,4 @@
-package thunder
+package websocket
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"sync"
+	"github.com/imba3r/thunder"
 )
 
 type WebSocketOperation string
@@ -27,7 +28,7 @@ const (
 )
 
 type WebSocketHandler struct {
-	thunder  *Thunder
+	thunder  *thunder.Thunder
 	upgrader websocket.Upgrader
 	mutex    sync.Mutex
 }
@@ -56,7 +57,7 @@ type PayloadMetadata struct {
 	Exists bool `json:"exists"`
 }
 
-func NewWebSocketHandler(thunder *Thunder) *WebSocketHandler {
+func NewWebSocketHandler(thunder *thunder.Thunder) *WebSocketHandler {
 	return &WebSocketHandler{
 		thunder: thunder,
 		upgrader: websocket.Upgrader{
@@ -107,18 +108,18 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 			case Subscribe:
 				if _, exists := subscriptions[m.Key]; !exists {
 					subscriptions[m.Key] = h.thunder.EventHandler.SubscribeWithFunc(m.Key, func() []byte {
-						if IsDocumentKey(m.Key) {
+						if thunder.IsDocumentKey(m.Key) {
 							doc, _ := h.thunder.Store.Document(m.Key)
 							data, _ := doc.Get();
 							return data;
 						}
-						if IsCollectionKey(m.Key) {
+						if thunder.IsCollectionKey(m.Key) {
 							c, err := h.thunder.Store.Collection(m.Key)
 							if err != nil {
 								log.Println(err)
 							}
 
-							items, err := c.Items(Query{Limit: 15, OrderBy: "count", Ascending: true})
+							items, err := c.Items(thunder.Query{Limit: 15, OrderBy: "count", Ascending: true})
 							log.Println(items)
 							if err != nil {
 								log.Println(err)
@@ -135,7 +136,7 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 					})
 					go h.listen(m.Key, subscriptions[m.Key], conn)
 					// TODO: Distinguish documents and collections, send one snapshot here
-					if IsDocumentKey(m.Key) {
+					if thunder.IsDocumentKey(m.Key) {
 						d, err := h.thunder.Store.Document(m.Key)
 						if err != nil {
 							log.Println("[ERR:Subscribe]", err)
@@ -146,12 +147,12 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 						}
 						h.writeMessage(conn, createAnswer(ValueChange, m.Key, 0, data))
 					}
-					if IsCollectionKey(m.Key) {
+					if thunder.IsCollectionKey(m.Key) {
 						c, err := h.thunder.Store.Collection(m.Key)
 						if err != nil {
 							log.Println("[ERR:Subscribe]", err)
 						}
-						items, err := c.Items(Query{})
+						items, err := c.Items(thunder.Query{})
 						if err != nil {
 							log.Println("[ERR:Subscribe]", err)
 						}
