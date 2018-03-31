@@ -83,14 +83,14 @@ func (d *document) Get() ([]byte, error) {
 
 func (d *document) Set(data []byte) error {
 	return d.db.Update(func(txn *badger.Txn) error {
-		return txn.Set([]byte(d.path), data)
+		return txn.Set([]byte(d.key), data)
 	})
 }
 
 func (d *document) Update(data []byte) error {
 	// TODO check if it exists
 	return d.db.Update(func(txn *badger.Txn) error {
-		return txn.Set([]byte(d.path), data)
+		return txn.Set([]byte(d.key), data)
 	})
 }
 
@@ -122,8 +122,8 @@ func (c *collection) Add(data []byte) (thunder.Document, error) {
 }
 
 func (c *collection) All() ([]thunder.CollectionItem, error) {
+	var items []thunder.CollectionItem
 	err := c.db.View(func(txn *badger.Txn) error {
-		var items []thunder.CollectionItem
 
 		// Create iterator that does not prefetch values.
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
@@ -131,12 +131,13 @@ func (c *collection) All() ([]thunder.CollectionItem, error) {
 
 		// Iterate with collection key as prefix.
 		prefix := []byte(c.key)
+		prefix = append(prefix, byte('/'))
 		prefixLength := len(prefix)
 		var itemCopyDst []byte
 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
 			item := it.Item()
 			key := item.Key()
-			subCollection := bytes.ContainsAny(key[:prefixLength], "/")
+			subCollection := bytes.ContainsAny(key[prefixLength:], "/")
 			if !subCollection {
 				itemCopyDst, err := item.ValueCopy(itemCopyDst)
 				if err != nil {
@@ -147,5 +148,5 @@ func (c *collection) All() ([]thunder.CollectionItem, error) {
 		}
 		return nil
 	})
-	return nil, err
+	return items, err
 }

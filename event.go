@@ -7,6 +7,7 @@ import (
 
 type EventHandler interface {
 	Subscribe(key string) chan []byte
+	SubscribeWithFunc(key string, f func() []byte) chan []byte
 	Unsubscribe(key string, channel chan []byte)
 	Publish(key string, data []byte)
 }
@@ -17,15 +18,16 @@ type eventHandler struct {
 }
 
 type cmd struct {
-	op  registryOperation
-	key string
-
+	op      registryOperation
+	key     string
+	f       func() []byte
 	channel chan []byte
 	data    []byte
 }
 
 type topic struct {
 	key         string
+	f           func() []byte
 	subscribers []chan []byte
 }
 
@@ -47,7 +49,11 @@ func newEventHandler(logEvents bool) EventHandler {
 }
 
 func (e *eventHandler) Subscribe(key string) chan []byte {
-	return e.reg.subscribe(key)
+	return e.reg.subscribe(key, nil)
+}
+
+func (e *eventHandler) SubscribeWithFunc(key string, f func() []byte) chan []byte {
+	return e.reg.subscribe(key, f)
 }
 
 func (e *eventHandler) Unsubscribe(key string, channel chan []byte) {
@@ -61,9 +67,9 @@ func (e *eventHandler) Publish(key string, data []byte) {
 	e.reg.publish(key, data)
 }
 
-func (r *registry) subscribe(key string) chan []byte {
+func (r *registry) subscribe(key string, f func() []byte) chan []byte {
 	c := make(chan []byte, 1)
-	r.cmdChan <- cmd{op: sub, channel: c, key: key}
+	r.cmdChan <- cmd{op: sub, channel: c, key: key, f: f}
 	return c
 }
 
@@ -90,7 +96,7 @@ func (r *registry) start() {
 		case pub:
 			r.doPublish(cmd.key, cmd.data)
 		case sub:
-			r.doSubscribe(cmd.key, cmd.channel)
+			r.doSubscribe(cmd.key, cmd.f, cmd.channel)
 		case unsub:
 			r.doUnsubscribe(cmd.key, cmd.channel)
 		}
@@ -102,19 +108,24 @@ func (r *registry) doPublish(key string, data []byte) {
 	if !exists {
 		return
 	}
+	payload := data
+	if t.f != nil {
+		payload = t.f()
+	}
 	for _, sub := range t.subscribers {
 		select {
-		case sub <- data:
+		case sub <- payload:
 		default:
 		}
 	}
 }
 
-func (r *registry) doSubscribe(key string, channel chan []byte) {
+func (r *registry) doSubscribe(key string, f func() []byte, channel chan []byte) {
 	t, exists := r.topics[key]
 	if !exists {
 		r.topics[key] = &topic{
 			key:         key,
+			f:           f,
 			subscribers: []chan []byte{channel},
 		}
 	} else {

@@ -100,7 +100,32 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 			switch m.Operation {
 			case Subscribe:
 				if _, exists := subscriptions[m.Key]; !exists {
-					subscriptions[m.Key] = h.thunder.EventHandler.Subscribe(m.Key)
+					subscriptions[m.Key] = h.thunder.EventHandler.SubscribeWithFunc(m.Key, func() []byte {
+						log.Println("Calling subscription Function!")
+						if IsDocumentKey(m.Key) {
+							doc, _ := h.thunder.Store.Document(m.Key)
+							data, _ := doc.Get();
+							return data;
+						}
+						if IsCollectionKey(m.Key) {
+							doc, err := h.thunder.Store.Collection(m.Key)
+							if err != nil {
+								log.Println(err)
+							}
+							items, err := doc.All();
+							log.Println(items)
+							if err != nil {
+								log.Println(err)
+							}
+							data, err := json.Marshal(items);
+							if err != nil {
+								log.Println(err)
+							}
+							log.Println(string(data))
+							return data
+						}
+						return nil
+					})
 					go h.listen(m.Key, subscriptions[m.Key], conn)
 					// TODO: Distinguish documents and collections, send one snapshot here
 					if IsDocumentKey(m.Key) {
