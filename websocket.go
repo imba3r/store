@@ -33,13 +33,19 @@ type WebSocketHandler struct {
 }
 
 type WebSocketMessage struct {
-	Operation       WebSocketOperation `json:"operation"`
-	Key             string             `json:"key"`
-	RequestID       uint64             `json:"requestId"`
-	TransactionID   uint64             `json:"transactionId"`
-	Error           Error              `json:"error"`
-	Payload         json.RawMessage    `json:"payload,omitempty"`
-	PayloadMetadata PayloadMetadata    `json:"payloadMetadata,omitempty"`
+	Operation           WebSocketOperation  `json:"operation"`
+	OperationParameters OperationParameters `json:"operationParameters,omitempty"`
+	Key                 string              `json:"key"`
+	RequestID           uint64              `json:"requestId"`
+	TransactionID       uint64              `json:"transactionId"`
+	Error               Error               `json:"error"`
+	Payload             json.RawMessage     `json:"payload,omitempty"`
+	PayloadMetadata     PayloadMetadata     `json:"payloadMetadata,omitempty"`
+}
+
+type OperationParameters struct {
+	Order   string `json:"order"`
+	OrderBy string `json:"orderBy"`
 }
 
 type Error struct {
@@ -116,6 +122,9 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 							if err != nil {
 								log.Println(err)
 							}
+
+							sortByNumber(items, "count")
+
 							data, err := json.Marshal(items);
 							if err != nil {
 								log.Println(err)
