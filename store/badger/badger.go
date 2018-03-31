@@ -17,12 +17,12 @@ type badgerStore struct {
 
 type document struct {
 	key string
-	*badgerStore
+	store  *badgerStore
 }
 
 type collection struct {
 	key string
-	*badgerStore
+	store  *badgerStore
 }
 
 var _ thunder.Store = &badgerStore{}
@@ -38,18 +38,18 @@ func New(path string) thunder.Store {
 	return &badgerStore{db: db, path: path};
 }
 
-func (bs *badgerStore) Document(path string) (thunder.Document, error) {
-	if thunder.IsDocumentKey(path) {
-		return &document{path, bs}, nil
+func (bs *badgerStore) Document(key string) (thunder.Document, error) {
+	if thunder.IsDocumentKey(key) {
+		return &document{key, bs}, nil
 	}
-	return nil, fmt.Errorf("not a document path: %s", path)
+	return nil, fmt.Errorf("not a document path: %s", key)
 }
 
-func (bs *badgerStore) Collection(path string) (thunder.Collection, error) {
-	if thunder.IsCollectionKey(path) {
-		return &collection{path, bs}, nil
+func (bs *badgerStore) Collection(key string) (thunder.Collection, error) {
+	if thunder.IsCollectionKey(key) {
+		return &collection{key, bs}, nil
 	}
-	return nil, fmt.Errorf("not a document path: %s", path)
+	return nil, fmt.Errorf("not a document path: %s", key)
 }
 
 func (bs *badgerStore) Close() {
@@ -62,8 +62,8 @@ func (d *document) Key() string {
 
 func (d *document) Get() ([]byte, error) {
 	var value []byte
-	err := d.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get([]byte(d.path))
+	err := d.store.db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get([]byte(d.key))
 		if err != nil {
 			return err
 		}
@@ -82,20 +82,20 @@ func (d *document) Get() ([]byte, error) {
 }
 
 func (d *document) Set(data []byte) error {
-	return d.db.Update(func(txn *badger.Txn) error {
+	return d.store.db.Update(func(txn *badger.Txn) error {
 		return txn.Set([]byte(d.key), data)
 	})
 }
 
 func (d *document) Update(data []byte) error {
 	// TODO check if it exists
-	return d.db.Update(func(txn *badger.Txn) error {
+	return d.store.db.Update(func(txn *badger.Txn) error {
 		return txn.Set([]byte(d.key), data)
 	})
 }
 
 func (d *document) Delete() error {
-	return d.db.Update(func(txn *badger.Txn) error {
+	return d.store.db.Update(func(txn *badger.Txn) error {
 		return txn.Delete([]byte(d.key))
 	})
 }
@@ -105,7 +105,7 @@ func (c *collection) Key() string {
 }
 
 func (c *collection) Add(data []byte) (thunder.Document, error) {
-	seq, err := c.db.GetSequence([]byte(c.key), 1)
+	seq, err := c.store.db.GetSequence([]byte(c.key), 1)
 	defer seq.Release()
 	if err != nil {
 		return nil, err
@@ -114,7 +114,7 @@ func (c *collection) Add(data []byte) (thunder.Document, error) {
 	if err != nil {
 		return nil, err
 	}
-	d, err := c.Document(fmt.Sprintf("%s/%d", c.key, num))
+	d, err := c.store.Document(fmt.Sprintf("%s/%d", c.key, num))
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func (c *collection) Add(data []byte) (thunder.Document, error) {
 
 func (c *collection) All() ([]thunder.CollectionItem, error) {
 	var items []thunder.CollectionItem
-	err := c.db.View(func(txn *badger.Txn) error {
+	err := c.store.db.View(func(txn *badger.Txn) error {
 
 		// Create iterator that does not prefetch values.
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
