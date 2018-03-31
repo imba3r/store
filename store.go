@@ -14,13 +14,13 @@ type Collection interface {
 	Add(data []byte) (Document, error)
 }
 
-type CollectionItem struct {
-	Key   string
-	Value []byte
-}
-
 type Store interface {
 	Document(path string) (Document, error)
 	Collection(path string) (Collection, error)
 	Close()
+}
+
+type CollectionItem struct {
+	Key   string `json:"key"`
+	Value []byte `json:"value,omitempty"`
 }

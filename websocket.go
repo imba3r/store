@@ -103,7 +103,7 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 					subscriptions[m.Key] = h.thunder.EventHandler.Subscribe(m.Key)
 					go h.listen(m.Key, subscriptions[m.Key], conn)
 					// TODO: Distinguish documents and collections, send one snapshot here
-					if IsDocumentPath(m.Key) {
+					if IsDocumentKey(m.Key) {
 						d, err := h.thunder.Store.Document(m.Key)
 						if err != nil {
 							log.Println("[ERR:Subscribe]", err)
@@ -114,7 +114,7 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 						}
 						h.writeMessage(conn, createAnswer(ValueChange, m.Key, 0, data))
 					}
-					if IsCollectionPath(m.Key) {
+					if IsCollectionKey(m.Key) {
 						d, err := h.thunder.Store.Collection(m.Key)
 						if err != nil {
 							log.Println("[ERR:Subscribe]", err)

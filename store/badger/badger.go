@@ -39,14 +39,14 @@ func New(path string) thunder.Store {
 }
 
 func (bs *badgerStore) Document(path string) (thunder.Document, error) {
-	if thunder.IsDocumentPath(path) {
+	if thunder.IsDocumentKey(path) {
 		return &document{path, bs}, nil
 	}
 	return nil, fmt.Errorf("not a document path: %s", path)
 }
 
 func (bs *badgerStore) Collection(path string) (thunder.Collection, error) {
-	if thunder.IsCollectionPath(path) {
+	if thunder.IsCollectionKey(path) {
 		return &collection{path, bs}, nil
 	}
 	return nil, fmt.Errorf("not a document path: %s", path)
