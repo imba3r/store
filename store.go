@@ -12,7 +12,7 @@ type Document interface {
 
 type Collection interface {
 	Key() string
-	Query() Query
+	Items(query Query) ([]CollectionItem, error)
 	Add(data []byte) (Document, error)
 }
 
@@ -22,10 +22,10 @@ type Store interface {
 	Close()
 }
 
-type Query interface {
-	Items() ([]CollectionItem, error)
-	OrderBy(key string, ascending bool) Query
-	Limit(limit int) Query
+type Query struct {
+	Limit     int    `json:"limit"`
+	OrderBy   string `json:"orderBy"`
+	Ascending bool   `json:"ascending"`
 }
 
 type CollectionItem struct {

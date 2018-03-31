@@ -118,7 +118,7 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 								log.Println(err)
 							}
 
-							items, err := c.Query().OrderBy("count", true).Limit(15).Items()
+							items, err := c.Items(Query{Limit: 15, OrderBy: "count", Ascending: true})
 							log.Println(items)
 							if err != nil {
 								log.Println(err)
@@ -151,7 +151,7 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 						if err != nil {
 							log.Println("[ERR:Subscribe]", err)
 						}
-						items, err := c.Query().Items()
+						items, err := c.Items(Query{})
 						if err != nil {
 							log.Println("[ERR:Subscribe]", err)
 						}

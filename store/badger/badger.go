@@ -128,18 +128,14 @@ func (c *collection) Add(data []byte) (thunder.Document, error) {
 	return d, d.Set(data)
 }
 
-func (c *collection) Query() thunder.Query {
-	return &query{collection: c}
-}
-
-func (q *query) Items() ([]thunder.CollectionItem, error) {
+func (c *collection) Items(q thunder.Query) ([]thunder.CollectionItem, error) {
 	var items []thunder.CollectionItem
-	err := q.collection.store.db.View(func(txn *badger.Txn) error {
+	err := c.store.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
 
 		// Iterate with collection key as prefix.
-		prefix := []byte(q.collection.key)
+		prefix := []byte(c.key)
 		prefix = append(prefix, byte('/'))
 		prefixLength := len(prefix)
 		var itemCopyDst []byte
@@ -157,22 +153,11 @@ func (q *query) Items() ([]thunder.CollectionItem, error) {
  		}
 		return nil
 	})
-	if q.orderBy != "" {
-		thunder.OrderBy(items, q.orderBy, q.ascending)
+	if q.OrderBy != "" {
+		thunder.OrderBy(items, q.OrderBy, q.Ascending)
 	}
-	if q.limit != 0 {
-		return items[:q.limit], err
+	if q.Limit != 0 {
+		return items[:q.Limit], err
 	}
 	return items, err
-}
-
-func (q *query) Limit(limit int) thunder.Query {
-	q.limit = limit
-	return q
-}
-
-func (q *query) OrderBy(key string, ascending bool) thunder.Query {
-	q.orderBy = key
-	q.ascending = ascending
-	return q
 }
