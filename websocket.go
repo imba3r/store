@@ -103,6 +103,32 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 					subscriptions[m.Key] = h.thunder.EventHandler.Subscribe(m.Key)
 					go h.listen(m.Key, subscriptions[m.Key], conn)
 					// TODO: Distinguish documents and collections, send one snapshot here
+					if IsDocumentPath(m.Key) {
+						d, err := h.thunder.Store.Document(m.Key)
+						if err != nil {
+							log.Println("[ERR:Subscribe]", err)
+						}
+						data, err := d.Get()
+						if err != nil {
+							log.Println("[ERR:Subscribe]", err)
+						}
+						h.writeMessage(conn, createAnswer(ValueChange, m.Key, 0, data))
+					}
+					if IsCollectionPath(m.Key) {
+						d, err := h.thunder.Store.Collection(m.Key)
+						if err != nil {
+							log.Println("[ERR:Subscribe]", err)
+						}
+						items, err := d.All()
+						if err != nil {
+							log.Println("[ERR:Subscribe]", err)
+						}
+						data, err := json.Marshal(items)
+						if err != nil {
+							log.Println("[ERR:Subscribe]", err)
+						}
+						h.writeMessage(conn, createAnswer(ValueChange, m.Key, 0, data))
+					}
 				}
 			case Set:
 				d, err := h.thunder.Store.Document(m.Key)
@@ -132,7 +158,14 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 					log.Println("[ERR:Delete]", err)
 				}
 			case Add:
-				// TODO
+				c, err := h.thunder.Store.Collection(m.Key)
+				if err != nil {
+					log.Println("[ERR:Add]", err)
+				}
+				_, err = c.Add(m.Payload)
+				if err != nil {
+					log.Println("[ERR:Add]", err)
+				}
 			}
 		}
 	}

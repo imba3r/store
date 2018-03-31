@@ -7,6 +7,7 @@ import (
 	"github.com/dgraph-io/badger"
 
 	"github.com/imba3r/thunder"
+	"bytes"
 )
 
 type badgerStore struct {
@@ -63,7 +64,7 @@ func (d *document) Get() ([]byte, error) {
 	var value []byte
 	err := d.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(d.path))
-		if err == nil {
+		if err != nil {
 			return err
 		}
 		v, err := item.Value()
@@ -125,18 +126,24 @@ func (c *collection) All() ([]thunder.CollectionItem, error) {
 		var items []thunder.CollectionItem
 
 		// Create iterator that does not prefetch values.
-		opts := badger.DefaultIteratorOptions
-		opts.PrefetchValues = false
-		it := txn.NewIterator(opts)
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
 		defer it.Close()
 
 		// Iterate with collection key as prefix.
 		prefix := []byte(c.key)
+		prefixLength := len(prefix)
+		var itemCopyDst []byte
 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
 			item := it.Item()
-			items[string(item.Key())]
-			k := item.Key()
-			fmt.Printf("key=%s\n", k)
+			key := item.Key()
+			subCollection := bytes.ContainsAny(key[:prefixLength], "/")
+			if !subCollection {
+				itemCopyDst, err := item.ValueCopy(itemCopyDst)
+				if err != nil {
+					return err
+				}
+				items = append(items, thunder.CollectionItem{Key: string(key), Value: itemCopyDst})
+			}
 		}
 		return nil
 	})
