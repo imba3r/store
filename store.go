@@ -10,7 +10,13 @@ type Document interface {
 
 type Collection interface {
 	Key() string
+	All() ([]CollectionItem, error)
 	Add(data []byte) (Document, error)
+}
+
+type CollectionItem struct {
+	Key   string
+	Value []byte
 }
 
 type Store interface {

@@ -119,3 +119,26 @@ func (c *collection) Add(data []byte) (thunder.Document, error) {
 	}
 	return d, d.Set(data)
 }
+
+func (c *collection) All() ([]thunder.CollectionItem, error) {
+	err := c.db.View(func(txn *badger.Txn) error {
+		var items []thunder.CollectionItem
+
+		// Create iterator that does not prefetch values.
+		opts := badger.DefaultIteratorOptions
+		opts.PrefetchValues = false
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		// Iterate with collection key as prefix.
+		prefix := []byte(c.key)
+		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
+			item := it.Item()
+			items[string(item.Key())]
+			k := item.Key()
+			fmt.Printf("key=%s\n", k)
+		}
+		return nil
+	})
+	return nil, err
+}
