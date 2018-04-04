@@ -47,8 +47,9 @@ type WebSocketMessage struct {
 }
 
 type OperationParameters struct {
-	OrderBy   string `json:"orderBy"`
-	Ascending bool   `json:"ascending"`
+	Query store.Query `json:"query"`
+	Limit store.Limit `json:"limit"`
+	Order store.Order `json:"offset"`
 }
 
 type Error struct {
@@ -92,7 +93,7 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 			msgType, msg, err := conn.ReadMessage()
 			if err != nil {
 				log.Println("[ERR] websocket.Conn.ReadMessage", err)
-				return
+				continue
 			}
 			if msgType != websocket.TextMessage {
 				log.Println("[ERR] messageType must be websocket.TextMessage")
@@ -105,38 +106,16 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 				log.Println("[ERR] json.Unmarshal", err)
 				continue
 			}
-
 			switch m.Operation {
 			case Subscribe:
 				if _, exists := subscriptions[m.Key]; !exists {
-					subscriptions[m.Key] = h.thunder.PubSub.SubscribeWithFunc(m.Key, func() []byte {
-						if store.IsDocumentKey(m.Key) {
-							doc, _ := h.thunder.Store.Document(m.Key)
-							data, _ := doc.Get();
-							return data;
-						}
-						if store.IsCollectionKey(m.Key) {
-							c, err := h.thunder.Store.Collection(m.Key)
-							if err != nil {
-								log.Println(err)
-							}
+					c, err := h.handleSubscribe(m, conn)
+					if err != nil {
+						log.Println("[ERR] h.handleSubscribe", err)
+						continue
+					}
+					subscriptions[m.Key] = c
 
-							items, err := c.Items(store.Query{Value:"5", Operator:store.Ge, Field:"count"}, store.Order{OrderBy: "count", Ascending:true}, store.Limit{Limit:5, Offset:10})
-							log.Println(items)
-							if err != nil {
-								log.Println(err)
-							}
-
-							data, err := json.Marshal(items);
-							if err != nil {
-								log.Println(err)
-							}
-							log.Println(string(data))
-							return data
-						}
-						return nil
-					})
-					go h.listen(m.Key, subscriptions[m.Key], conn)
 					// TODO: Distinguish documents and collections, send one snapshot here
 					if store.IsDocumentKey(m.Key) {
 						d, err := h.thunder.Store.Document(m.Key)
@@ -205,6 +184,116 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 		}
 	}
 }
+
+func (h *WebSocketHandler) handleSubscribe(m WebSocketMessage, conn *websocket.Conn) (chan []byte, error) {
+	var channel chan []byte
+	var err error
+	if store.IsDocumentKey(m.Key) {
+		channel = h.thunder.PubSub.Subscribe(m.Key)
+	} else {
+		f := func() ([]byte, error) {
+			collection, err := h.thunder.Store.Collection(m.Key)
+			if err != nil {
+				return nil, err
+			}
+			p := m.OperationParameters
+			items, err := collection.Items(p.Query, p.Order, p.Limit)
+			if err != nil {
+				return nil, err
+			}
+
+			data, err := json.Marshal(items);
+			if err != nil {
+				return nil, err
+			}
+			return data, nil
+		}
+		channel, err = h.thunder.PubSub.SubscribeWithFunc(m.Key, f)
+		snapshot, err := f()
+	}
+	if err != nil {
+		go h.listen(m.Key, channel, conn)
+	}
+	return channel, err
+}
+
+				items, err := c.Items(store.Query{Value:"5", Operator:store.Ge, Field:"count"}, store.Order{OrderBy: "count", Ascending:true}, store.Limit{Limit:5, Offset:10})
+				log.Println(items)
+				if err != nil {
+					log.Println(err)
+				}
+
+				data, err := json.Marshal(items);
+				if err != nil {
+					log.Println(err)
+				}
+				log.Println(string(data))
+				return data
+			}
+			return nil
+		})
+	}
+	go h.listen(m.Key, c, conn)
+
+
+
+		subscriptions[m.Key] = h.thunder.PubSub.SubscribeWithFunc(m.Key, func() []byte {
+			if store.IsDocumentKey(m.Key) {
+				doc, _ := h.thunder.Store.Document(m.Key)
+				data, _ := doc.Get();
+				return data;
+			}
+			if store.IsCollectionKey(m.Key) {
+				c, err := h.thunder.Store.Collection(m.Key)
+				if err != nil {
+					log.Println(err)
+				}
+
+				items, err := c.Items(store.Query{Value:"5", Operator:store.Ge, Field:"count"}, store.Order{OrderBy: "count", Ascending:true}, store.Limit{Limit:5, Offset:10})
+				log.Println(items)
+				if err != nil {
+					log.Println(err)
+				}
+
+				data, err := json.Marshal(items);
+				if err != nil {
+					log.Println(err)
+				}
+				log.Println(string(data))
+				return data
+			}
+			return nil
+		})
+		go h.listen(m.Key, subscriptions[m.Key], conn)
+		// TODO: Distinguish documents and collections, send one snapshot here
+		if store.IsDocumentKey(m.Key) {
+			d, err := h.thunder.Store.Document(m.Key)
+			if err != nil {
+				log.Println("[ERR:Subscribe]", err)
+			}
+			data, err := d.Get()
+			if err != nil {
+				log.Println("[ERR:Subscribe]", err)
+			}
+			h.writeMessage(conn, createAnswer(ValueChange, m.Key, 0, data))
+		}
+		if store.IsCollectionKey(m.Key) {
+			c, err := h.thunder.Store.Collection(m.Key)
+			if err != nil {
+				log.Println("[ERR:Subscribe]", err)
+			}
+			items, err := c.Items(store.Query{}, store.Order{}, store.Limit{})
+			if err != nil {
+				log.Println("[ERR:Subscribe]", err)
+			}
+			data, err := json.Marshal(items)
+			if err != nil {
+				log.Println("[ERR:Subscribe]", err)
+			}
+			h.writeMessage(conn, createAnswer(ValueChange, m.Key, 0, data))
+		}
+}
+
 
 func (h *WebSocketHandler) listen(key string, channel chan []byte, conn *websocket.Conn) {
 	for {

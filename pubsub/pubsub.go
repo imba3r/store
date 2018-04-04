@@ -8,7 +8,7 @@ import (
 type PubSub interface {
 	Publish(key string, data []byte)
 	Subscribe(key string) chan []byte
-	SubscribeWithFunc(key string, f func() []byte) chan []byte
+	SubscribeWithFunc(key string, f func() ([]byte, error)) (chan []byte, error)
 	Unsubscribe(key string, channel chan []byte)
 }
 
