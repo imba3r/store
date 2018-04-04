@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"log"
+	"sync"
 
 	"github.com/gorilla/websocket"
-	"sync"
+
 	"github.com/imba3r/thunder"
 	"github.com/imba3r/thunder/store"
 )
@@ -120,7 +121,7 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 								log.Println(err)
 							}
 
-							items, err := c.Items(store.Query{}, store.Order{OrderBy: "count", Ascending:false}, store.Limit{Limit:5, Offset:10})
+							items, err := c.Items(store.Query{Value:"5", Operator:store.Ge, Field:"count"}, store.Order{OrderBy: "count", Ascending:true}, store.Limit{Limit:5, Offset:10})
 							log.Println(items)
 							if err != nil {
 								log.Println(err)

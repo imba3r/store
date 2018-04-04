@@ -1,12 +1,16 @@
-package order
+package store
 
 import (
 	"sort"
 	"github.com/Jeffail/gabs"
-	"github.com/imba3r/thunder/store"
 )
 
-func OrderJSON(items []store.CollectionItem, order store.Order) {
+type Order struct {
+	OrderBy   string `json:"orderBy"`
+	Ascending bool   `json:"ascending"`
+}
+
+func OrderJSON(items []CollectionItem, order Order) {
 	sort.Slice(items, func(i, j int) bool {
 		if !order.Ascending {
 			i, j = j, i

@@ -8,7 +8,6 @@ import (
 	"github.com/dgraph-io/badger"
 
 	"github.com/imba3r/thunder/store"
-	"github.com/imba3r/thunder/order"
 )
 
 type badgerStore struct {
@@ -133,9 +132,6 @@ func (c *collection) Items(q store.Query, o store.Order, l store.Limit) ([]store
 	queryItems := q != (store.Query{})
 	orderItems := o != (store.Order{})
 	limitItems := l != (store.Limit{})
-
-	limitAfterLoop := limitItems && orderItems
-	limitWhileLoop := limitItems && !orderItems
 	limit := l.Limit + l.Offset
 
 	var items []store.CollectionItem
@@ -144,40 +140,46 @@ func (c *collection) Items(q store.Query, o store.Order, l store.Limit) ([]store
 		defer it.Close()
 
 		// Iterate with collection key as prefix.
-		prefix := []byte(c.key)
-		prefix = append(prefix, byte('/'))
+		prefix := append([]byte(c.key), byte('/'))
 		prefixLength := len(prefix)
-		var itemCopyDst []byte
+		var itemCopy []byte
 		for it.Seek(prefix); it.ValidForPrefix(prefix); it.Next() {
 			item := it.Item()
 			key := item.Key()
-			subCollection := bytes.ContainsAny(key[prefixLength:], "/")
-			if !subCollection {
-
-				if queryItems {
-					// query
-				}
-
-				if limitWhileLoop && len(items) == limit {
-					items = items[l.Offset:limit]
+			collectionItem := !bytes.ContainsAny(key[prefixLength:], "/")
+			if collectionItem {
+				// If items are unordered we may break during
+				// iteration once the limit has been reached.
+				if limitItems && !orderItems && len(items) == limit {
 					break
 				}
 
-				itemCopyDst, err := item.ValueCopy(itemCopyDst)
+				// Copy the item contents as they are no longer
+				// valid outside of the current transaction.
+				itemCopy, err := item.ValueCopy(itemCopy)
 				if err != nil {
 					return err
 				}
-				items = append(items, store.CollectionItem{Key: string(key), Value: itemCopyDst})
+
+				// Filter out items that don't match the query (if any).
+				if queryItems && !store.Matches(itemCopy, q){
+					continue
+				}
+				items = append(items, store.CollectionItem{Key: string(key), Value: itemCopy})
 			}
 		}
 		return nil
 	})
 	// Sort..
 	if orderItems {
-		order.OrderJSON(items, o)
+		store.OrderJSON(items, o)
 	}
-	if limitAfterLoop {
-		items = items[l.Offset:limit ]
+	// .. and limit.
+	if limitItems && len(items) >= l.Offset {
+		items = items[l.Offset:]
+	}
+	if limitItems && len(items) >= l.Limit {
+		items = items[:l.Limit]
 	}
 	return items, err
 }

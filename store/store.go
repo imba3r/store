@@ -2,9 +2,6 @@ package store
 
 import (
 	"encoding/json"
-	"strings"
-	"log"
-	"fmt"
 )
 
 type Store interface {
@@ -27,22 +24,6 @@ type Collection interface {
 	Add(data []byte) (Document, error)
 }
 
-type Limit struct {
-	Limit  int `json:"limit"`
-	Offset int `json:"offset"`
-}
-
-type Order struct {
-	OrderBy   string `json:"orderBy"`
-	Ascending bool   `json:"ascending"`
-}
-
-type Query struct {
-	Field    string `json:"field"`
-	Operator string `json:"operator"`
-	Value    string `json:"value"`
-}
-
 type CollectionItem struct {
 	Key   string
 	Value []byte
@@ -56,21 +37,4 @@ func (i CollectionItem) MarshalJSON() ([]byte, error) {
 		Key:   i.Key,
 		Value: i.Value,
 	})
-}
-
-func IsCollectionKey(path string) bool {
-	return len(strings.Split(path, "/"))%2 == 1;
-}
-
-func IsDocumentKey(path string) bool {
-	return !IsCollectionKey(path);
-}
-
-func CollectionKey(documentKey string) string {
-	split := strings.Split(documentKey, "/")
-	if len(split) < 2 || len(split)%2 == 1 {
-		// FIXME hmm
-		log.Fatal("not a document key: ", documentKey)
-	}
-	return strings.TrimSuffix(documentKey, fmt.Sprintf("/%s", split[len(split)-1]))
 }
