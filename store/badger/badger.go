@@ -8,6 +8,7 @@ import (
 	"github.com/dgraph-io/badger"
 
 	"github.com/imba3r/thunder/store"
+	"github.com/imba3r/thunder/order"
 )
 
 type badgerStore struct {
@@ -129,6 +130,14 @@ func (c *collection) Add(data []byte) (store.Document, error) {
 }
 
 func (c *collection) Items(q store.Query, o store.Order, l store.Limit) ([]store.CollectionItem, error) {
+	queryItems := q != (store.Query{})
+	orderItems := o != (store.Order{})
+	limitItems := l != (store.Limit{})
+
+	limitAfterLoop := limitItems && orderItems
+	limitWhileLoop := limitItems && !orderItems
+	limit := l.Limit + l.Offset
+
 	var items []store.CollectionItem
 	err := c.store.db.View(func(txn *badger.Txn) error {
 		it := txn.NewIterator(badger.DefaultIteratorOptions)
@@ -144,20 +153,31 @@ func (c *collection) Items(q store.Query, o store.Order, l store.Limit) ([]store
 			key := item.Key()
 			subCollection := bytes.ContainsAny(key[prefixLength:], "/")
 			if !subCollection {
+
+				if queryItems {
+					// query
+				}
+
+				if limitWhileLoop && len(items) == limit {
+					items = items[l.Offset:limit]
+					break
+				}
+
 				itemCopyDst, err := item.ValueCopy(itemCopyDst)
 				if err != nil {
 					return err
 				}
 				items = append(items, store.CollectionItem{Key: string(key), Value: itemCopyDst})
 			}
- 		}
+		}
 		return nil
 	})
-	//if o.OrderBy != "" {
-	//	order.OrderJSON().OrderBy(items, q.OrderBy, q.Ascending)
-	//}
-	//if q.Limit != 0 {
-	//	return items[:q.Limit], err
-	//}
+	// Sort..
+	if orderItems {
+		order.OrderJSON(items, o)
+	}
+	if limitAfterLoop {
+		items = items[l.Offset:limit ]
+	}
 	return items, err
 }

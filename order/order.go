@@ -3,23 +3,24 @@ package order
 import (
 	"sort"
 	"github.com/Jeffail/gabs"
+	"github.com/imba3r/thunder/store"
 )
 
-func OrderJSON(items [][]byte, path string, ascending bool) {
+func OrderJSON(items []store.CollectionItem, order store.Order) {
 	sort.Slice(items, func(i, j int) bool {
-		if !ascending {
+		if !order.Ascending {
 			i, j = j, i
 		}
-		a, err := gabs.ParseJSON(items[i])
+		a, err := gabs.ParseJSON(items[i].Value)
 		if err != nil {
 			return true
 		}
-		b, err := gabs.ParseJSON(items[j])
+		b, err := gabs.ParseJSON(items[j].Value)
 		if err != nil {
 			return false
 		}
-		valueA := a.Search(path).Data()
-		valueB := b.Search(path).Data()
+		valueA := a.Path(order.OrderBy).Data()
+		valueB := b.Path(order.OrderBy).Data()
 		if valueA == nil && valueB != nil {
 			return true
 		}

@@ -120,7 +120,7 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 								log.Println(err)
 							}
 
-							items, err := c.Items(store.Query{}, store.Order{}, store.Limit{})
+							items, err := c.Items(store.Query{}, store.Order{OrderBy: "count", Ascending:false}, store.Limit{Limit:5, Offset:10})
 							log.Println(items)
 							if err != nil {
 								log.Println(err)
