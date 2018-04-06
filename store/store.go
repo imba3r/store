@@ -5,8 +5,8 @@ import (
 )
 
 type Store interface {
-	Document(path string) (Document, error)
-	Collection(path string) (Collection, error)
+	Document(key string) (Document, error)
+	Collection(key string) (Collection, error)
 	Close()
 }
 

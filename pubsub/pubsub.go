@@ -8,7 +8,7 @@ import (
 type PubSub interface {
 	Publish(key string, data []byte)
 	Subscribe(key string) chan []byte
-	SubscribeWithFunc(key string, f func() ([]byte, error)) (chan []byte, error)
+	SubscribeWithFunc(key string, f func() ([]byte, error)) chan []byte
 	Unsubscribe(key string, channel chan []byte)
 }
 
@@ -20,14 +20,14 @@ type eventHandler struct {
 type cmd struct {
 	op      registryOperation
 	key     string
-	f       func() []byte
+	f       func() ([]byte, error)
 	channel chan []byte
 	data    []byte
 }
 
 type topic struct {
 	key         string
-	f           func() []byte
+	f           func() ([]byte, error)
 	subscribers []chan []byte
 }
 
@@ -52,7 +52,7 @@ func (e *eventHandler) Subscribe(key string) chan []byte {
 	return e.reg.subscribe(key, nil)
 }
 
-func (e *eventHandler) SubscribeWithFunc(key string, f func() []byte) chan []byte {
+func (e *eventHandler) SubscribeWithFunc(key string, f func() ([]byte, error)) chan []byte {
 	return e.reg.subscribe(key, f)
 }
 
@@ -67,7 +67,7 @@ func (e *eventHandler) Publish(key string, data []byte) {
 	e.reg.publish(key, data)
 }
 
-func (r *registry) subscribe(key string, f func() []byte) chan []byte {
+func (r *registry) subscribe(key string, f func() ([]byte, error)) chan []byte {
 	c := make(chan []byte, 1)
 	r.cmdChan <- cmd{op: sub, channel: c, key: key, f: f}
 	return c
@@ -109,8 +109,13 @@ func (r *registry) doPublish(key string, data []byte) {
 		return
 	}
 	payload := data
+	var err error
 	if t.f != nil {
-		payload = t.f()
+		payload, err = t.f()
+		if err != nil {
+			log.Println("[ERR] Subscribe Func returned error: ", err)
+			return
+		}
 	}
 	for _, sub := range t.subscribers {
 		select {
@@ -120,7 +125,7 @@ func (r *registry) doPublish(key string, data []byte) {
 	}
 }
 
-func (r *registry) doSubscribe(key string, f func() []byte, channel chan []byte) {
+func (r *registry) doSubscribe(key string, f func() ([]byte, error), channel chan []byte) {
 	t, exists := r.topics[key]
 	if !exists {
 		r.topics[key] = &topic{
