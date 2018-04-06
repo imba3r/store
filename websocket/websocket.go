@@ -108,6 +108,7 @@ func (h *WebSocketHandler) HandlerFunc() http.HandlerFunc {
 			}
 			switch m.Operation {
 			case Subscribe:
+				// TODO distinguish subscriptions to same key with different parameters
 				if _, exists := subscriptions[m.Key]; !exists {
 					c, err := h.handleSubscribe(m, conn)
 					if err != nil {
