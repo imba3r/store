@@ -4,7 +4,14 @@ import (
 	"encoding/json"
 )
 
+type Encoding string
+
+const (
+	Json Encoding = "JSON"
+)
+
 type Store interface {
+	Open(enc Encoding) error
 	Document(key string) (Document, error)
 	Collection(key string) (Collection, error)
 	Close()

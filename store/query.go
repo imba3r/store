@@ -22,7 +22,7 @@ type Query struct {
 	Value    string   `json:"value"`
 }
 
-func Matches(data []byte, query Query) bool {
+func MatchesJSON(data []byte, query Query) bool {
 	j, err := gabs.ParseJSON(data)
 	if err != nil {
 		return false

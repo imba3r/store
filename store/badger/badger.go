@@ -2,7 +2,6 @@ package badger
 
 import (
 	"fmt"
-	"log"
 	"bytes"
 
 	"github.com/dgraph-io/badger"
@@ -12,7 +11,10 @@ import (
 
 type badgerStore struct {
 	path string
-	db   *badger.DB
+	enc  store.Encoding
+
+	db      *badger.DB
+	options badger.Options
 }
 
 type document struct {
@@ -38,11 +40,19 @@ func New(path string) store.Store {
 	opts := badger.DefaultOptions
 	opts.Dir = path
 	opts.ValueDir = path
-	db, err := badger.Open(opts)
+
+	return &badgerStore{path: path, options: opts};
+}
+
+func (bs *badgerStore) Open(enc store.Encoding) error {
+	db, err := badger.Open(bs.options)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	return &badgerStore{db: db, path: path};
+
+	bs.enc = enc
+	bs.db = db
+	return nil
 }
 
 func (bs *badgerStore) Document(key string) (store.Document, error) {
@@ -162,7 +172,7 @@ func (c *collection) Items(q store.Query, o store.Order, l store.Limit) ([]store
 				}
 
 				// Filter out items that don't match the query (if any).
-				if queryItems && !store.Matches(itemCopy, q){
+				if queryItems && !store.MatchesJSON(itemCopy, q) {
 					continue
 				}
 				items = append(items, store.CollectionItem{Key: string(key), Value: itemCopy})

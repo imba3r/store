@@ -26,6 +26,10 @@ func newAdapter(store store.Store, pubsub pubsub.PubSub) *adapter {
 	return &adapter{store, pubsub}
 }
 
+func (a *adapter) Open(enc store.Encoding) error {
+	return a.store.Open(enc)
+}
+
 func (a *adapter) Document(path string) (store.Document, error) {
 	d, err := a.store.Document(path)
 	return &document{d, a.pubsub}, err

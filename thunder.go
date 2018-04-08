@@ -17,3 +17,7 @@ func New(s store.Store, logEvents bool) *Thunder {
 		PubSub: ps,
 	}
 }
+
+func (t *Thunder) Open(enc store.Encoding) {
+	t.Store.Open(enc)
+}

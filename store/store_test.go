@@ -6,11 +6,11 @@ import (
 	"github.com/imba3r/thunder/store"
 )
 
-func TestMatches_Float(t *testing.T) {
+func TestMatchesJSON_Float(t *testing.T) {
 	test := struct{ Test float64 }{Test: 1234}
 	data, _ := json.Marshal(test)
 
-	matches := store.Matches(data, store.Query{
+	matches := store.MatchesJSON(data, store.Query{
 		Value:    "1234",
 		Operator: store.Eq,
 		Field:    "Test",
@@ -21,11 +21,11 @@ func TestMatches_Float(t *testing.T) {
 	}
 }
 
-func TestMatches_String(t *testing.T) {
+func TestMatchesJSON_String(t *testing.T) {
 	test := struct{ Test string }{Test: "1234"}
 	data, _ := json.Marshal(test)
 
-	matches := store.Matches(data, store.Query{
+	matches := store.MatchesJSON(data, store.Query{
 		Value:    "1234",
 		Operator: store.Eq,
 		Field:    "Test",
@@ -36,11 +36,11 @@ func TestMatches_String(t *testing.T) {
 	}
 }
 
-func TestMatches_Nil(t *testing.T) {
+func TestMatchesJSON_Nil(t *testing.T) {
 	test := struct{}{}
 	data, _ := json.Marshal(test)
 
-	matches := store.Matches(data, store.Query{
+	matches := store.MatchesJSON(data, store.Query{
 		Value:    "",
 		Operator: store.Eq,
 		Field:    "Test",
